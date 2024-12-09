@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>First to the other side wins. Move forward and side-to-side - capture diagonally / horizontally</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f4f4;
+        }
+        h1 {
+            margin: 20px;
+        }
+        .board {
+            display: grid;
+            grid-template-columns: repeat(16, 50px); /* 16 columns for the board */
+            grid-template-rows: repeat(8, 50px); /* 8 rows */
+            border: 2px solid #333;
+        }
+        .cell {
+            width: 50px;
+            height: 50px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background-color: #fff;
+            border: 1px solid #ccc;
+        }
+        .cell:nth-child(even) {
+            background-color: #ddd;
+        }
+        .pawn {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        .player1 {
+            background-color: blue;
+        }
+        .player2 {
+            background-color: red;
+        }
+        .marked {
+            font-size: 24px;
+        }
+        #message {
+            margin: 20px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Eliminate ALL the Xs to win!  Attack vertically and horizontally</h1>
+    <div class="board" id="board"></div>
+    <div id="message">Player 1's Turn</div>
+    <script>
+        const boardElement = document.getElementById('board');
+        const messageElement = document.getElementById('message');
+
+        const board = [];
+        let currentPlayer = 1;
+
+        // Count of remaining "X" pieces for each player
+        let player1XCount = 8; // X pieces in row 1
+        let player2XCount = 8; // X pieces in row 6
+
+        // Turn sequence: Player 1 and Player 2 with specific number of turns
+        const turnSequence = [
+            { player: 1, turns: 1 },
+            { player: 2, turns: 3 },
+            { player: 1, turns: 2 },
+            { player: 2, turns: 2 },
+            { player: 1, turns: 3 },
+            { player: 2, turns: 1 },
+            { player: 1, turns: 1 },
+            { player: 2, turns: 3 },
+            { player: 1, turns: 2 },
+            { player: 2, turns: 2 },
+            { player: 1, turns: 3 },
+            { player: 2, turns: 1 },
+            { player: 1, turns: 2 },
+            { player: 2, turns: 2 },
+        ];
+        let turnSequenceIndex = 0;
+        let remainingTurns = turnSequence[0].turns;
+
+        function initializeBoard() {
+            for (let row = 0; row < 8; row++) {
+                board[row] = [];
+                for (let col = 0; col < 16; col++) {
+                    board[row][col] = null;
+                    const cell = document.createElement('div');
+                    cell.classList.add('cell');
+                    cell.dataset.row = row;
+                    cell.dataset.col = col;
+
+                    boardElement.appendChild(cell);
+                }
+            }
+
+            // Add Player 1 pawns in rows 1 and 2
+            for (let col = 4; col < 12; col++) {
+                addPawn(1, 1, col, true); // X pieces
+                addPawn(1, 2, col, false);
+            }
+
+            // Add Player 2 pawns in rows 5 and 6
+            for (let col = 4; col < 12; col++) {
+                addPawn(2, 6, col, true); // X pieces
+                addPawn(2, 5, col, false);
+            }
+        }
+
+        function addPawn(player, row, col, isMarked) {
+            const cell = getCell(row, col);
+            const pawn = document.createElement('div');
+            pawn.classList.add('pawn', player === 1 ? 'player1' : 'player2');
+            pawn.dataset.player = player;
+            pawn.dataset.row = row;
+            pawn.dataset.col = col;
+            pawn.dataset.marked = isMarked; // Track if this is an "X" piece
+
+            // Mark X pieces visually
+            if (isMarked) {
+                const marker = document.createElement('span');
+                marker.textContent = 'X';
+                marker.classList.add('marked');
+                pawn.appendChild(marker);
+            }
+
+            pawn.addEventListener('click', handlePawnClick);
+            cell.appendChild(pawn);
+            board[row][col] = player;
+        }
+
+        function getCell(row, col) {
+            return document.querySelector(`.cell[data-row='${row}'][data-col='${col}']`);
+        }
+
+        let selectedPawn = null;
+
+        function handlePawnClick(e) {
+            const pawn = e.target.closest('.pawn');
+            const pawnPlayer = parseInt(pawn.dataset.player);
+
+            if (pawnPlayer !== currentPlayer) {
+                if (selectedPawn) {
+                    const startRow = parseInt(selectedPawn.dataset.row);
+                    const startCol = parseInt(selectedPawn.dataset.col);
+                    const targetRow = parseInt(pawn.dataset.row);
+                    const targetCol = parseInt(pawn.dataset.col);
+
+                    if (
+                        (Math.abs(targetCol - startCol) === 1 && targetRow === startRow) || // Horizontal attack
+                        (Math.abs(targetCol - startCol) === 1 && Math.abs(targetRow - startRow) === 1) // Diagonal attack
+                    ) {
+                        capturePawn(selectedPawn, pawn, startRow, startCol, targetRow, targetCol);
+                        return;
+                    }
+                }
+                messageElement.textContent = "It's not your turn!";
+                return;
+            }
+
+            if (selectedPawn) selectedPawn.classList.remove('selected');
+            selectedPawn = pawn;
+            pawn.classList.add('selected');
+            messageElement.textContent = `Selected Pawn at (${pawn.dataset.row}, ${pawn.dataset.col}). Choose a cell to move.`;
+        }
+
+        boardElement.addEventListener('click', (e) => {
+            if (!selectedPawn || !e.target.classList.contains('cell')) return;
+
+            const targetCell = e.target;
+            const targetRow = parseInt(targetCell.dataset.row);
+            const targetCol = parseInt(targetCell.dataset.col);
+
+            const startRow = parseInt(selectedPawn.dataset.row);
+            const startCol = parseInt(selectedPawn.dataset.col);
+
+            const targetPlayer = board[targetRow][targetCol];
+
+if (
+    (targetRow === startRow && Math.abs(targetCol - startCol) === 1) || // Sideways
+    (Math.abs(targetRow - startRow) === 1 && targetCol === startCol) // Forward or backward
+) {
+    movePawn(selectedPawn, startRow, startCol, targetRow, targetCol);
+    return;
+}
+
+if (
+    selectedPawn && 
+    board[targetRow][targetCol] !== null && // There's a piece to attack
+    Math.abs(targetCol - startCol) === 1 && // Sideways or diagonal
+    Math.abs(targetRow - startRow) === 1 && // One row forward only
+    targetRow === startRow + (currentPlayer === 1 ? 1 : -1) // Forward attack
+) {
+    capturePawn(selectedPawn, getCell(targetRow, targetCol).firstChild, startRow, startCol, targetRow, targetCol);
+    return;
+}
+            messageElement.textContent = "Invalid move!";
+        });
+
+        function capturePawn(selectedPawn, targetPawn, startRow, startCol, targetRow, targetCol) {
+            targetPawn.remove();
+            board[targetRow][targetCol] = null;
+
+            // Update X piece count if an X piece is captured
+            const isMarked = targetPawn.dataset.marked === 'true';
+            if (isMarked) {
+                if (parseInt(targetPawn.dataset.player) === 1) {
+                    player1XCount--;
+                } else if (parseInt(targetPawn.dataset.player) === 2) {
+                    player2XCount--;
+                }
+            }
+
+            // Check if the game is over
+            if (player1XCount <= 0) {
+                endGame(2);
+                return;
+            }
+            if (player2XCount <= 0) {
+                endGame(1);
+                return;
+            }
+
+            movePawn(selectedPawn, startRow, startCol, targetRow, targetCol);
+        }
+
+        function movePawn(pawn, startRow, startCol, targetRow, targetCol) {
+            const targetCell = getCell(targetRow, targetCol);
+
+            // Update board state
+            board[startRow][startCol] = null;
+            board[targetRow][targetCol] = currentPlayer;
+
+            // Move pawn visually
+            pawn.dataset.row = targetRow;
+            pawn.dataset.col = targetCol;
+            targetCell.appendChild(pawn);
+
+            remainingTurns -= 1;
+            if (remainingTurns === 0) {
+                turnSequenceIndex = (turnSequenceIndex + 1) % turnSequence.length;
+                currentPlayer = turnSequence[turnSequenceIndex].player;
+                remainingTurns = turnSequence[turnSequenceIndex].turns;
+            }
+
+            messageElement.textContent = `Player ${currentPlayer}'s Turn (${remainingTurns} turn(s) remaining)`;
+            selectedPawn.classList.remove('selected');
+            selectedPawn = null;
+        }
+
+        function endGame(winner) {
+            messageElement.textContent = `Player ${winner} Wins!`;
+            boardElement.style.pointerEvents = 'none';
+        }
+
+        initializeBoard();
+    </script>
+</body>
+</html>
